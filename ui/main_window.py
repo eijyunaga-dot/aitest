@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         
         # ウィンドウ設定
         self.setWindowTitle("AI比較アプリケーション")
-        self.setMinimumSize(1200, 800)
+        self.setMinimumSize(1200, 720)  # 1366x768解像度に対応
         
         # UIの初期化
         self._init_ui()
@@ -68,6 +68,16 @@ class MainWindow(QMainWindow):
             self
         )
         self.tab_widget.addTab(self.image_ai_widget, "画像AI")
+        
+       # 音声AI比較タブ（NotebookLMのみ）
+        notebooklm_service = self.ai_manager.get_audio_ai_service('notebooklm')
+        audio_ai_services = [notebooklm_service]  # 1つだけ
+        self.audio_ai_widget = AIComparisonWidget(
+            audio_ai_services, 
+            self.settings, 
+            self
+        )
+        self.tab_widget.addTab(self.audio_ai_widget, "音声要約など")
         
         # 中央ウィジェットとして設定
         self.setCentralWidget(self.tab_widget)
@@ -111,7 +121,6 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(QLabel())  # スペーサー
         self.title_label = QLabel()
         self.title_label.setStyleSheet("font-size: 12px; color: #E0E0E0; padding: 0 20px;")
-        self.title_label.setWordWrap(True)  # 長いテキストの折り返しを有効化
         toolbar.addWidget(self.title_label)
         
         # 初期説明文を設定
@@ -149,19 +158,21 @@ class MainWindow(QMainWindow):
         }
         
         QToolButton {
-            background-color: transparent;
-            border: none;
+            background-color: #3A3A3A;
+            border: 1px solid #505050;
             border-radius: 4px;
             padding: 8px;
-            color: #E0E0E0;
+            color: #FFFFFF;
         }
         
         QToolButton:hover {
-            background-color: #3A3A3A;
+            background-color: #4A7BD8;
+            border: 1px solid #5B8DEE;
         }
         
         QToolButton:pressed {
-            background-color: #4A7BD8;
+            background-color: #3A6BC8;
+            border: 1px solid #4A7BD8;
         }
         
         QTabWidget::pane {
@@ -277,9 +288,11 @@ class MainWindow(QMainWindow):
         current_index = self.tab_widget.currentIndex()
         
         if current_index == 0:  # 文章AIタブ
-            text = "💡 初回はログインが必要。生成制限時はアカウントを変更で継続可能"
+            text = "💡 初回ログイン必要 | 制限時はアカウント変更で継続可能"
         elif current_index == 1:  # 画像AIタブ
-            text = "🎨 Geminiは＋横から🍌画像生成を選択、ImageFXは英語命令のみ"
+            text = "🎨 Gemini:＋→🍌選択 | ImageFX:英語のみ"
+        elif current_index == 2:  # 音声AIタブ
+            text = "🎙️ NotebookLM:音声要約と対話機能"
         else:
             text = "AI比較アプリケーション"
         

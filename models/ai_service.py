@@ -47,7 +47,7 @@ class AIServiceManager:
         self.image_ai_services: Dict[str, AIService] = {
             'gemini_nano': AIService(
                 name='gemini_nano',
-                display_name='Gemini (nanoibanana)',
+                display_name='Gemini (nanobanana)',
                 url='https://gemini.google.com/app?hl=ja',
                 profile_name='gemini_nano_profile',
                 description='Google Gemini - 画像生成'
@@ -67,6 +67,30 @@ class AIServiceManager:
                 description='DeepL翻訳'
             )
         }
+        
+        self.audio_ai_services: Dict[str, AIService] = {
+            'notebooklm': AIService(
+                name='notebooklm',
+                display_name='NotebookLM',
+                url='https://notebooklm.google.com/',
+                profile_name='notebooklm_profile',
+                description='Google NotebookLM - 音声要約'
+            ),
+            'gemini_audio': AIService(
+                name='gemini_audio',
+                display_name='Gemini (音声)',
+                url='https://gemini.google.com/app?hl=ja',
+                profile_name='gemini_audio_profile',
+                description='Google Gemini - 音声機能'
+            ),
+            'chatgpt_audio': AIService(
+                name='chatgpt_audio',
+                display_name='ChatGPT (音声)',
+                url='https://chatgpt.com/',
+                profile_name='chatgpt_audio_profile',
+                description='OpenAI ChatGPT - 音声機能'
+            )
+        }
     
     def get_text_ai_service(self, name: str) -> AIService:
         """文章AIサービスを取得する"""
@@ -83,3 +107,11 @@ class AIServiceManager:
     def get_all_image_ai_services(self) -> list[AIService]:
         """全ての画像AIサービスを取得する"""
         return list(self.image_ai_services.values())
+    
+    def get_audio_ai_service(self, name: str) -> AIService:
+        """音声AIサービスを取得する"""
+        return self.audio_ai_services.get(name)
+    
+    def get_all_audio_ai_services(self) -> list[AIService]:
+        """全ての音声AIサービスを取得する"""
+        return list(self.audio_ai_services.values())

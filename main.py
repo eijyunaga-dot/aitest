@@ -27,7 +27,7 @@ def main():
     
     # メインウィンドウの作成と表示
     window = MainWindow()
-    window.show()
+    window.showMaximized()  # 1366x768解像度でも最適に表示
     
     # イベントループの開始
     sys.exit(app.exec())
