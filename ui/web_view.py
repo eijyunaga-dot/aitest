@@ -9,6 +9,42 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 
 
+class CustomWebEnginePage(QWebEnginePage):
+    """ポップアップウィンドウをサポートするカスタムWebEnginePage"""
+    
+    def __init__(self, profile: QWebEngineProfile, parent=None):
+        super().__init__(profile, parent)
+    
+    def createWindow(self, window_type):
+        """新しいウィンドウ/タブを作成（Googleログインのポップアップ対応）"""
+        # 新しいページを作成
+        page = CustomWebEnginePage(self.profile(), self)
+        
+        # 新しいビューを作成してページを設定
+        view = QWebEngineView()
+        view.setPage(page)
+        
+        # ウィンドウサイズを設定（Googleログイン画面に適したサイズ）
+        view.resize(600, 700)
+        view.setWindowTitle("認証")
+        
+        # ウィンドウを表示
+        view.show()
+        
+        # ビューへの参照を保持してGCを防ぐ（ウィンドウが閉じられたら解放）
+        # このページの子として設定されているため、ページが生きている限りビューも生きるはずだが
+        # 明示的に保持しておく方が安全
+        if not hasattr(self, '_popups'):
+            self._popups = []
+        self._popups.append(view)
+        
+        # ウィンドウが閉じられたらリストから削除
+        # view.destroyed.connect(lambda: self._popups.remove(view) if view in self._popups else None)
+        
+        return page
+
+
+
 class SuspendableWebView(QWebEngineView):
     """サスペンド機能を持つWebView"""
     
@@ -17,8 +53,8 @@ class SuspendableWebView(QWebEngineView):
     def __init__(self, profile: QWebEngineProfile, parent=None):
         super().__init__(parent)
         
-        # プロファイルの設定
-        page = QWebEnginePage(profile, self)
+        # プロファイルの設定（カスタムページを使用）
+        page = CustomWebEnginePage(profile, self)
         self.setPage(page)
         
         # サスペンド管理

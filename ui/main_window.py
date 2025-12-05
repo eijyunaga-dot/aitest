@@ -65,13 +65,22 @@ class MainWindow(QMainWindow):
         self.image_ai_widget = AIComparisonWidget(
             image_ai_services, 
             self.settings, 
+            self,
+            custom_sizes=[2, 1]  # ImageFX:DeepL = 2:1
+        )
+        self.tab_widget.addTab(self.image_ai_widget, "画像ほかAI")
+        
+        # Gemini画像生成タブ
+        gemini_image_services = self.ai_manager.get_all_gemini_image_services()
+        self.gemini_image_widget = AIComparisonWidget(
+            gemini_image_services, 
+            self.settings, 
             self
         )
-        self.tab_widget.addTab(self.image_ai_widget, "画像AI")
+        self.tab_widget.addTab(self.gemini_image_widget, "AdobeExpress")
         
-       # 音声AI比較タブ（NotebookLMのみ）
-        notebooklm_service = self.ai_manager.get_audio_ai_service('notebooklm')
-        audio_ai_services = [notebooklm_service]  # 1つだけ
+       # NotebookLMタブ
+        audio_ai_services = self.ai_manager.get_all_audio_ai_services()
         self.audio_ai_widget = AIComparisonWidget(
             audio_ai_services, 
             self.settings, 
@@ -288,13 +297,13 @@ class MainWindow(QMainWindow):
         current_index = self.tab_widget.currentIndex()
         
         if current_index == 0:  # 文章AIタブ
-            text = "💡 初回ログイン必要 | 制限時はアカウント変更で継続可能"
+            text = "💡 初回のみログイン必要 | 保存は[ダウンロード]フォルダ固定"
         elif current_index == 1:  # 画像AIタブ
-            text = "🎨 Gemini:＋→🍌選択 | ImageFX:英語のみ"
+            text = "🎨 命令文は英語のみなのでDeepLで翻訳コピペ"
         elif current_index == 2:  # 音声AIタブ
-            text = "🎙️ NotebookLM:音声要約と対話機能"
+            text = "無料版は「月間10トークン」なのでご利用は計画的に"
         else:
-            text = "AI比較アプリケーション"
+            text = "🎙️ NotebookLM:音声要約とか登録資料の辞書化など"
         
         self.title_label.setText(text)
     

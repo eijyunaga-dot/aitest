@@ -3,9 +3,12 @@ AI比較アプリケーション - AI比較ウィジェットモジュール
 3つのAIサービスを横並びで表示するウィジェット
 """
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWebEngineCore import QWebEngineProfile
+from PySide6.QtCore import Qt, Signal, QStandardPaths
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEngineDownloadRequest
 from PySide6.QtWidgets import QWidget, QSplitter, QVBoxLayout, QHBoxLayout, QLabel
+import os
+import mimetypes
+import re
 
 from .web_view import LazyWebView
 from models.ai_service import AIService
@@ -17,13 +20,14 @@ class AIComparisonWidget(QWidget):
     
     tab_activated = Signal()  # タブがアクティブになったシグナル
     
-    def __init__(self, services: list[AIService], settings: Settings, parent=None):
+    def __init__(self, services: list[AIService], settings: Settings, parent=None, custom_sizes=None):
         super().__init__(parent)
         
         self.services = services
         self.settings = settings
         self.lazy_views: list[LazyWebView] = []
         self.is_initialized = False
+        self.custom_sizes = custom_sizes  # カスタムスプリッターサイズ
         
         # UIの初期化
         self._init_ui()
@@ -52,6 +56,16 @@ class AIComparisonWidget(QWidget):
             # 日本語の言語設定を追加
             profile.setHttpAcceptLanguage("ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7")
             
+            # WebEngineSettingsの設定（Googleログイン対策）
+            settings = profile.settings()
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.AllowWindowActivationFromJavaScript, True)
+            
+            # ダウンロードハンドラの設定
+            profile.downloadRequested.connect(self._handle_download)
+            
             # LazyWebViewの作成
             lazy_view = LazyWebView(service.url, profile, self)
             
@@ -75,18 +89,40 @@ class AIComparisonWidget(QWidget):
                 }
             """)
             
+            # 説明文ラベル
+            description_label = QLabel(service.description)
+            description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            description_label.setStyleSheet("""
+                QLabel {
+                    background-color: #2D2D2D;
+                    color: #5B9BD5;
+                    padding: 3px;
+                    font-size: 18px;
+                    border-bottom: 1px solid #404040;
+                }
+            """)
+            
             # ストレッチファクターでWebViewを大きく表示
             container_layout.addWidget(title_label, 0)  # ストレッチなし（固定サイズ）
+            container_layout.addWidget(description_label, 0)  # ストレッチなし（固定サイズ）
             container_layout.addWidget(lazy_view, 1)    # ストレッチあり（残りスペース全体）
             
             # スプリッターに追加
             self.splitter.addWidget(container)
             self.lazy_views.append(lazy_view)
         
-        # 均等分割
-        total_width = 1200  # デフォルト幅
-        size_per_view = total_width // len(self.services)
-        self.splitter.setSizes([size_per_view] * len(self.services))
+        # スプリッターのサイズ設定
+        if self.custom_sizes:
+            # カスタムサイズが指定されている場合
+            total = sum(self.custom_sizes)
+            base_width = 1200
+            sizes = [int(base_width * size / total) for size in self.custom_sizes]
+            self.splitter.setSizes(sizes)
+        else:
+            # 均等分割
+            total_width = 1200  # デフォルト幅
+            size_per_view = total_width // len(self.services)
+            self.splitter.setSizes([size_per_view] * len(self.services))
         
         # スプリッターをレイアウトに追加
         main_layout.addWidget(self.splitter)
@@ -157,6 +193,75 @@ class AIComparisonWidget(QWidget):
                 web_view = lazy_view.get_web_view()
                 if web_view.history().canGoForward():
                     web_view.forward()
+    
+    def _handle_download(self, download):
+        """ダウンロードリクエストのハンドリング"""
+        # ユーザーのダウンロードフォルダを取得
+        downloads_path = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DownloadLocation
+        )
+        
+        # ファイル名の取得
+        file_name = download.downloadFileName()
+        
+        # Windowsで無効な文字を置換（: / \ ? * " < > |）
+        file_name = re.sub(r'[\\/:*?"<>|]', '_', file_name)
+        
+        # 拡張子がない場合の補完処理
+        base_name, ext = os.path.splitext(file_name)
+        if not ext:
+            mime_type = download.mimeType()
+            if mime_type:
+                # 一般的な画像形式のフォールバック
+                if mime_type == "image/png":
+                    ext = ".png"
+                elif mime_type == "image/jpeg":
+                    ext = ".jpg"
+                elif mime_type == "image/webp":
+                    ext = ".webp"
+                else:
+                    # その他の形式はmimetypesで推測
+                    guessed = mimetypes.guess_extension(mime_type)
+                    if guessed:
+                        ext = guessed
+            
+            # それでも拡張子がない場合、デフォルトでpngを試す（Geminiの画像生成用）
+            if not ext and "image" in str(mime_type):
+                 ext = ".png"
+                 
+            if ext:
+                file_name = f"{base_name}{ext}"
+        
+        file_path = os.path.join(downloads_path, file_name)
+        
+        # 同名ファイルが存在する場合は番号を付ける
+        counter = 1
+        base_name, ext = os.path.splitext(file_name)
+        while os.path.exists(file_path):
+            file_name = f"{base_name} ({counter}){ext}"
+            file_path = os.path.join(downloads_path, file_name)
+            counter += 1
+        
+        # ダウンロードパスを設定して開始
+        download.setDownloadDirectory(downloads_path)
+        download.setDownloadFileName(file_name)
+        download.accept()
+        
+        # ダウンロード状態の監視
+        download.stateChanged.connect(
+            lambda state: self._on_download_state_changed(state, download)
+        )
+        
+        print(f"ダウンロード開始: {file_name} -> {file_path}")
+    
+    def _on_download_state_changed(self, state, download):
+        """ダウンロード状態変更時の処理"""
+        if state == QWebEngineDownloadRequest.DownloadState.DownloadCompleted:
+            print(f"ダウンロード完了: {download.downloadFileName()}")
+        elif state == QWebEngineDownloadRequest.DownloadState.DownloadCancelled:
+            print(f"ダウンロードキャンセル: {download.downloadFileName()}")
+        elif state == QWebEngineDownloadRequest.DownloadState.DownloadInterrupted:
+            print(f"ダウンロード中断: {download.downloadFileName()}")
     
     def get_memory_info(self) -> dict:
         """メモリ情報を取得"""
