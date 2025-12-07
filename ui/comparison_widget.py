@@ -56,7 +56,7 @@ class AIComparisonWidget(QWidget):
             # 日本語の言語設定を追加
             profile.setHttpAcceptLanguage("ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7")
             
-            # WebEngineSettingsの設定（Googleログイン対策・Adobe Express対策）
+            # WebEngineSettingsの設定（Googleログイン対策）
             settings = profile.settings()
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
@@ -102,7 +102,7 @@ class AIComparisonWidget(QWidget):
                     background-color: #2D2D2D;
                     color: #5B9BD5;
                     padding: 3px;
-                    font-size: 18px;
+                    font-size: 13.5px;
                     border-bottom: 1px solid #404040;
                 }
             """)
@@ -171,8 +171,9 @@ class AIComparisonWidget(QWidget):
     def on_tab_hide(self):
         """タブが非表示になった時の処理"""
         # 自動サスペンドが有効な場合、全てのビューをサスペンド
+        # 自動サスペンドが有効な場合、全てのビューをサスペンド
         if self.settings.get('auto_suspend', True):
-            for lazy_view in self.lazy_views:
+            for i, lazy_view in enumerate(self.lazy_views):
                 if lazy_view.is_view_loaded():
                     lazy_view.suspend()
     

@@ -33,7 +33,7 @@ class AIServiceManager:
                 display_name='Gemini',
                 url='https://gemini.google.com/app?hl=ja',
                 profile_name='gemini_profile',
-                description='質問応答、画像生成は条件に「～の画風で」をつけると、その画風で生成してくれる'
+                description='質問応答、画像生成は条件に「～の画風で」をつけると、その画風で生成'
             ),
             'perplexity': AIService(
                 name='perplexity',
@@ -50,14 +50,14 @@ class AIServiceManager:
                 display_name='ImageFX',
                 url='https://labs.google/fx/ja',
                 profile_name='imagefx_profile',
-                description='ImageFX(画像生成)ほか音楽生成など(英語命令文のみ対応)'
+                description='試験的AIツール Whisk(画/動の複合),Flow(動画),ImageFX(画像),MusicFX(音楽)'
             ),
             'deepl': AIService(
                 name='deepl',
                 display_name='DeepL',
                 url='https://www.deepl.com/ja/translator#ja/en/',
                 profile_name='deepl_profile',
-                description='ImageFXなどへの命令文翻訳用'
+                description='命令文JP➔EN翻訳'
             )
         }
         

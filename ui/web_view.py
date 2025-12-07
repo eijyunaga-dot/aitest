@@ -28,6 +28,21 @@ class CustomWebEnginePage(QWebEnginePage):
         view.resize(600, 700)
         view.setWindowTitle("認証")
         
+        # NotebookLMダウンロード時の空ポップアップ自動クローズ機能
+        # Adobe Expressが外部ブラウザになったため、この機能を有効化しても問題ない
+        def check_and_close(ok):
+            if ok:
+                # 少し待ってからURLをチェック（リダイレクト等を考慮）
+                def delayed_check():
+                    url = page.url().toString()
+                    title = page.title()
+                    # URLまたはタイトルが空/about:blankの場合のみ閉じる
+                    if (not url or url == "about:blank") and (not title or title == "about:blank"):
+                        print(f"Empty popup detected (NotebookLM download), auto-closing: {url} title={title}")
+                        view.close()
+                QTimer.singleShot(2000, delayed_check)
+        page.loadFinished.connect(check_and_close)
+        
         # ウィンドウを表示
         view.show()
         
@@ -39,7 +54,7 @@ class CustomWebEnginePage(QWebEnginePage):
         self._popups.append(view)
         
         # ウィンドウが閉じられたらリストから削除
-        # view.destroyed.connect(lambda: self._popups.remove(view) if view in self._popups else None)
+        view.destroyed.connect(lambda: self._popups.remove(view) if view in self._popups else None)
         
         return page
 
@@ -143,6 +158,8 @@ class SuspendableWebView(QWebEngineView):
                 print(f"WebView 再開: {self.url().toString()}")
             except Exception as e:
                 print(f"再開失敗: {e}")
+                # Adobe Express等の複雑なアプリでは、リロードすると状態が壊れるため
+                # エラー時でもリロードしない
     
     def set_suspend_timeout(self, timeout_ms: int):
         """サスペンドタイムアウトを設定（ミリ秒）"""

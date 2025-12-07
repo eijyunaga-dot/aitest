@@ -3,6 +3,7 @@ AI比較アプリケーション - メインウィンドウモジュール
 """
 
 import psutil
+import webbrowser
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import (
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from .comparison_widget import AIComparisonWidget
+from .web_editor_widget import WebEditorWidget
 from models.ai_service import AIServiceManager
 from utils.settings import Settings
 
@@ -70,16 +72,7 @@ class MainWindow(QMainWindow):
         )
         self.tab_widget.addTab(self.image_ai_widget, "画像ほかAI")
         
-        # Gemini画像生成タブ
-        gemini_image_services = self.ai_manager.get_all_gemini_image_services()
-        self.gemini_image_widget = AIComparisonWidget(
-            gemini_image_services, 
-            self.settings, 
-            self
-        )
-        self.tab_widget.addTab(self.gemini_image_widget, "AdobeExpress")
-        
-       # NotebookLMタブ
+        # 音声要約などタブ
         audio_ai_services = self.ai_manager.get_all_audio_ai_services()
         self.audio_ai_widget = AIComparisonWidget(
             audio_ai_services, 
@@ -87,6 +80,10 @@ class MainWindow(QMainWindow):
             self
         )
         self.tab_widget.addTab(self.audio_ai_widget, "音声要約など")
+        
+        # 画像編集(WEB)タブ - 外部ブラウザで開くボタン
+        self.web_editor_widget = WebEditorWidget(self)
+        self.tab_widget.addTab(self.web_editor_widget, "画像編集(WEB)")
         
         # 中央ウィジェットとして設定
         self.setCentralWidget(self.tab_widget)
@@ -132,6 +129,7 @@ class MainWindow(QMainWindow):
         self.title_label.setStyleSheet("font-size: 12px; color: #E0E0E0; padding: 0 20px;")
         toolbar.addWidget(self.title_label)
         
+        # 初期説明文を設定
         # 初期説明文を設定
         self._update_title_description()
         
@@ -227,10 +225,14 @@ class MainWindow(QMainWindow):
                 widget = self.tab_widget.widget(i)
                 if isinstance(widget, AIComparisonWidget):
                     widget.on_tab_hide()
+                elif isinstance(widget, WebEditorWidget):
+                    widget.on_tab_hide()
         
         # 現在のタブを表示処理
         current_widget = self.tab_widget.widget(index)
         if isinstance(current_widget, AIComparisonWidget):
+            current_widget.on_tab_show()
+        elif isinstance(current_widget, WebEditorWidget):
             current_widget.on_tab_show()
         
         # 説明文を更新
@@ -301,9 +303,9 @@ class MainWindow(QMainWindow):
         elif current_index == 1:  # 画像AIタブ
             text = "🎨 命令文は英語のみなのでDeepLで翻訳コピペ"
         elif current_index == 2:  # 音声AIタブ
-            text = "無料版は「月間10トークン」なのでご利用は計画的に"
+            text = "🎙️ダウンロードできたら認証ウィンドウは閉じて下さい"
         else:
-            text = "🎙️ NotebookLM:音声要約とか登録資料の辞書化など"
+            text = "adobeは不安定なのでブラウザショートカットにしました"
         
         self.title_label.setText(text)
     

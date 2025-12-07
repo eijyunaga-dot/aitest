@@ -20,19 +20,11 @@ def main():
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     
-    # Adobe Express対策: Chromiumのフラグ設定
-    # SharedArrayBuffer, WebAssemblyThreads（エディタ画面で必要）, セキュリティ制限の緩和, GPU高速化
+    # Chromiumのフラグ設定（GPU高速化のみ維持）
     import os
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
-        "--enable-features=SharedArrayBuffer,WebAssemblyThreads "
-        "--disable-web-security "
-        "--allow-running-insecure-content "
-        "--disable-features=BlockInsecurePrivateNetworkRequests "
         "--ignore-gpu-blocklist "
-        "--enable-gpu-rasterization "
-        "--renderer-process-limit=20 "
-        "--js-flags=--max-old-space-size=4096 "
-        "--disable-web-gl-image-chromium"
+        "--enable-gpu-rasterization"
     )
     
     # アプリケーションの作成
