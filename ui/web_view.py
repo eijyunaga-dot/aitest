@@ -63,12 +63,47 @@ class SuspendableWebView(QWebEngineView):
         self.suspend_timer.timeout.connect(self._auto_suspend)
         self.suspend_timeout = 300000  # 5分（ミリ秒）
         
-        # ページロード完了時にタイマーをリセット
+        # ロードタイムアウト管理（Adobe Express対策）
+        self.load_timeout_timer = QTimer(self)
+        self.load_timeout_timer.setSingleShot(True)
+        self.load_timeout_timer.timeout.connect(self._on_load_timeout)
+        self.load_timeout_duration = 30000  # 30秒
+        
+        # イベント接続
+        self.loadStarted.connect(self._on_load_started)
+        self.loadProgress.connect(self._on_load_progress)
         self.loadFinished.connect(self._on_load_finished)
+        self.renderProcessTerminated.connect(self._on_render_process_terminated)
     
-    def _on_load_finished(self):
+    def _on_load_started(self):
+        """ページロード開始時の処理"""
+        print(f"Load started: {self.url().toString()}")
+        self.load_timeout_timer.start(self.load_timeout_duration)
+    
+    def _on_load_progress(self, progress):
+        """ページロード進行状況の処理"""
+        if progress > 0 and progress < 100:
+            self.load_timeout_timer.start(self.load_timeout_duration)
+    
+    def _on_load_timeout(self):
+        """ロードタイムアウト時の処理"""
+        print(f"⚠️ Load timeout - Auto reload: {self.url().toString()}")
+        self.load_timeout_timer.stop()
+        QTimer.singleShot(500, self.reload)
+    
+    def _on_render_process_terminated(self, termination_status, exit_code):
+        """レンダリングプロセスクラッシュ時の処理"""
+        print(f"Render process terminated - Auto reload")
+        QTimer.singleShot(1000, self.reload)
+    
+    def _on_load_finished(self, ok):
         """ページロード完了時の処理"""
-        self._reset_suspend_timer()
+        self.load_timeout_timer.stop()
+        if ok:
+            print(f"✓ Load finished: {self.url().toString()}")
+            self._reset_suspend_timer()
+        else:
+            print(f"✗ Load failed: {self.url().toString()}")
     
     def _reset_suspend_timer(self):
         """サスペンドタイマーをリセット"""

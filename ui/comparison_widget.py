@@ -56,12 +56,17 @@ class AIComparisonWidget(QWidget):
             # 日本語の言語設定を追加
             profile.setHttpAcceptLanguage("ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7")
             
-            # WebEngineSettingsの設定（Googleログイン対策）
+            # WebEngineSettingsの設定（Googleログイン対策・Adobe Express対策）
             settings = profile.settings()
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.AllowWindowActivationFromJavaScript, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True)
+            
+            # Adobe Expressエディタ画面対策：WebGL/Canvas高速化
+            settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, True)
             
             # ダウンロードハンドラの設定
             profile.downloadRequested.connect(self._handle_download)
