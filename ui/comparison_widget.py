@@ -56,6 +56,10 @@ class AIComparisonWidget(QWidget):
             # 日本語の言語設定を追加
             profile.setHttpAcceptLanguage("ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7")
             
+            # User-Agentの設定（指定がある場合）
+            if service.user_agent:
+                profile.setHttpUserAgent(service.user_agent)
+            
             # WebEngineSettingsの設定（Googleログイン対策）
             settings = profile.settings()
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
@@ -63,6 +67,7 @@ class AIComparisonWidget(QWidget):
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.AllowWindowActivationFromJavaScript, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
             
             # Adobe Expressエディタ画面対策：WebGL/Canvas高速化
             settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
@@ -170,9 +175,9 @@ class AIComparisonWidget(QWidget):
     
     def on_tab_hide(self):
         """タブが非表示になった時の処理"""
-        # 自動サスペンドが有効な場合、全てのビューをサスペンド
-        # 自動サスペンドが有効な場合、全てのビューをサスペンド
-        if self.settings.get('auto_suspend', True):
+        # 自動サスペンドが有効な場合のみ、ビューをサスペンド
+        # デフォルトはFalse（タブ切り替え時にビュー状態を維持）
+        if self.settings.get('auto_suspend', False):
             for i, lazy_view in enumerate(self.lazy_views):
                 if lazy_view.is_view_loaded():
                     lazy_view.suspend()

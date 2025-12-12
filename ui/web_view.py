@@ -4,9 +4,9 @@ AI比較アプリケーション - カスタムWebビューモジュール
 """
 
 from PySide6.QtCore import QUrl, QTimer, Signal, Qt
-from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 
 
 class CustomWebEnginePage(QWebEnginePage):
@@ -17,46 +17,88 @@ class CustomWebEnginePage(QWebEnginePage):
     
     def createWindow(self, window_type):
         """新しいウィンドウ/タブを作成（Googleログインのポップアップ対応）"""
-        # 新しいページを作成
-        page = CustomWebEnginePage(self.profile(), self)
+        # 親ウィンドウとなるコンテナを作成
+        popup = QWidget()
+        popup.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        popup.setWindowTitle("ダウンロード中－完了後に自動で閉じます")
+        popup.resize(600, 750)
         
-        # 新しいビューを作成してページを設定
-        view = QWebEngineView()
+        layout = QVBoxLayout(popup)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # URL表示用ラベル（セキュリティ対策）
+        url_label = QLabel("URL: Loading...")
+        url_label.setStyleSheet("""
+            QLabel {
+                background-color: #f0f0f0;
+                color: #333;
+                padding: 8px;
+                border-bottom: 1px solid #ccc;
+                font-family: monospace;
+            }
+        """)
+        layout.addWidget(url_label)
+        
+        # 新しいページとビューを作成
+        page = CustomWebEnginePage(self.profile(), popup)
+        view = QWebEngineView(popup)
         view.setPage(page)
         
-        # ウィンドウサイズを設定（Googleログイン画面に適したサイズ）
-        view.resize(600, 700)
-        view.setWindowTitle("認証")
+        # URL変更時にラベルを更新（長すぎる場合は省略）
+        def update_url_label(url):
+            try:
+                url_str = url.toString()
+                if len(url_str) > 150:
+                    url_str = url_str[:150] + "..."
+                url_label.setText(f"URL: {url_str}")
+            except RuntimeError:
+                # ウィンドウが閉じられてラベルが削除された場合に発生するエラーを無視
+                pass
+            
+        view.urlChanged.connect(update_url_label)
         
-        # NotebookLMダウンロード時の空ポップアップ自動クローズ機能
-        # Adobe Expressが外部ブラウザになったため、この機能を有効化しても問題ない
-        def check_and_close(ok):
-            if ok:
-                # 少し待ってからURLをチェック（リダイレクト等を考慮）
-                def delayed_check():
-                    url = page.url().toString()
-                    title = page.title()
-                    # URLまたはタイトルが空/about:blankの場合のみ閉じる
-                    if (not url or url == "about:blank") and (not title or title == "about:blank"):
-                        print(f"Empty popup detected (NotebookLM download), auto-closing: {url} title={title}")
-                        view.close()
-                QTimer.singleShot(2000, delayed_check)
-        page.loadFinished.connect(check_and_close)
+        layout.addWidget(view)
         
         # ウィンドウを表示
-        view.show()
+        popup.show()
         
-        # ビューへの参照を保持してGCを防ぐ（ウィンドウが閉じられたら解放）
-        # このページの子として設定されているため、ページが生きている限りビューも生きるはずだが
-        # 明示的に保持しておく方が安全
+        # ウィンドウへの参照を保持してGCを防ぐ
         if not hasattr(self, '_popups'):
             self._popups = []
-        self._popups.append(view)
+        self._popups.append(popup)
         
-        # ウィンドウが閉じられたらリストから削除
-        view.destroyed.connect(lambda: self._popups.remove(view) if view in self._popups else None)
+        # ダウンロード完了時にウィンドウを自動で閉じる
+        from PySide6.QtWebEngineCore import QWebEngineDownloadRequest
+        
+        def handle_download(download_item):
+            # このページからのダウンロードリクエストか確認
+            # 注意: download_item.page() が None の場合もあるため安全策をとる
+            if download_item.page() == page:
+                def on_state_changed(state):
+                    if state == QWebEngineDownloadRequest.DownloadState.DownloadCompleted:
+                        # 少し遅延させてから閉じる（完了の余韻）
+                        QTimer.singleShot(1000, popup.close)
+                
+                download_item.stateChanged.connect(on_state_changed)
+        
+        # プロファイルのシグナルに接続
+        # 注意: 厳密にはdisconnectが必要だが、popupが消えればハンドラもGCされることを期待
+        # ただしプロファイルは長生きするので、ハンドラが残り続けるリスクがある。
+        # 接続オブジェクトを保持して、popup破棄時に切断するのが正しい。
+        conn = self.profile().downloadRequested.connect(handle_download)
+        
+        # ウィンドウが閉じられたらリストから削除 & シグナル切断
+        def cleanup():
+            if popup in self._popups:
+                self._popups.remove(popup)
+            self.profile().downloadRequested.disconnect(conn)
+            
+        popup.destroyed.connect(cleanup)
         
         return page
+        
+
 
 
 
@@ -69,7 +111,12 @@ class SuspendableWebView(QWebEngineView):
         super().__init__(parent)
         
         # プロファイルの設定（カスタムページを使用）
+        # プロファイルの設定（カスタムページを使用）
         page = CustomWebEnginePage(profile, self)
+        
+        # ユーザー操作なしでの動画再生を許可（Sora等）
+        page.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+        
         self.setPage(page)
         
         # サスペンド管理

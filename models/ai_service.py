@@ -14,6 +14,8 @@ class AIService:
     url: str
     profile_name: str
     description: str = ""
+    user_agent: str = None  # Noneの場合はデフォルトUAを使用
+
 
 
 class AIServiceManager:
@@ -34,13 +36,6 @@ class AIServiceManager:
                 url='https://gemini.google.com/app?hl=ja',
                 profile_name='gemini_profile',
                 description='質問応答、画像生成は条件に「～の画風で」をつけると、その画風で生成'
-            ),
-            'perplexity': AIService(
-                name='perplexity',
-                display_name='Perplexity',
-                url='https://www.perplexity.ai/',
-                profile_name='perplexity_profile',
-                description='WEB上の最新の情報を検索して要約してくれる'
             )
         }
         
@@ -82,6 +77,29 @@ class AIServiceManager:
                 description='動画音声の要約、登録資料の要約や辞書化など'
             )
         }
+        
+        # 動画生成AIタブ
+        self.video_ai_services: Dict[str, AIService] = {
+            'sora': AIService(
+                name='sora',
+                display_name='OpenAI Sora',
+                url='https://sora.chatgpt.com/',
+                profile_name='sora_profile',
+                description='動画生成AI (OpenAI)',
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            )
+        }
+        
+        # 開発者向けタブ
+        self.developer_ai_services: Dict[str, AIService] = {
+            'googleaistudio': AIService(
+                name='googleaistudio',
+                display_name='Google AI Studio',
+                url='https://aistudio.google.com/',
+                profile_name='googleaistudio_profile',
+                description='Geminiモデルのプロトタイピングと実験（開発者向け）'
+            )
+        }
     
     def get_text_ai_service(self, name: str) -> AIService:
         """文章AIサービスを取得する"""
@@ -110,3 +128,11 @@ class AIServiceManager:
     def get_all_audio_ai_services(self) -> list[AIService]:
         """全ての音声AIサービスを取得する"""
         return list(self.audio_ai_services.values())
+    
+    def get_all_video_ai_services(self) -> list[AIService]:
+        """全ての動画AIサービスを取得する"""
+        return list(self.video_ai_services.values())
+    
+    def get_all_developer_ai_services(self) -> list[AIService]:
+        """全ての開発者向けAIサービスを取得する"""
+        return list(self.developer_ai_services.values())

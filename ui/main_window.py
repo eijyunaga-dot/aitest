@@ -4,15 +4,20 @@ AI比較アプリケーション - メインウィンドウモジュール
 
 import psutil
 import webbrowser
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QMainWindow, QTabWidget, QToolBar, QStatusBar,
-    QLabel, QStyle
+    QMainWindow, QTabWidget, QStatusBar,
+    QLabel, QStyle, QToolButton, QHBoxLayout, QWidget
 )
 
 from .comparison_widget import AIComparisonWidget
+from .comparison_widget import AIComparisonWidget
 from .web_editor_widget import WebEditorWidget
+from .sora_widget import SoraWidget
 from models.ai_service import AIServiceManager
 from utils.settings import Settings
 
@@ -33,8 +38,8 @@ class MainWindow(QMainWindow):
         
         # UIの初期化
         self._init_ui()
-        self._create_statusbar()  # ツールバーより先に作成
-        self._create_toolbar()
+        self._create_statusbar()
+        self._create_tab_corner_controls()  # タブバー右端にナビゲーションコントロールを配置
         
         # ウィンドウジオメトリの復元
         self._restore_geometry()
@@ -60,7 +65,7 @@ class MainWindow(QMainWindow):
             self.settings, 
             self
         )
-        self.tab_widget.addTab(self.text_ai_widget, "文章AI")
+        self.tab_widget.addTab(self.text_ai_widget, "AIアシスタント")
         
         # 画像AI比較タブ
         image_ai_services = self.ai_manager.get_all_image_ai_services()
@@ -70,7 +75,7 @@ class MainWindow(QMainWindow):
             self,
             custom_sizes=[2, 1]  # ImageFX:DeepL = 2:1
         )
-        self.tab_widget.addTab(self.image_ai_widget, "画像ほかAI")
+        self.tab_widget.addTab(self.image_ai_widget, "音楽や動画など(Test版)")
         
         # 音声要約などタブ
         audio_ai_services = self.ai_manager.get_all_audio_ai_services()
@@ -79,7 +84,22 @@ class MainWindow(QMainWindow):
             self.settings, 
             self
         )
-        self.tab_widget.addTab(self.audio_ai_widget, "音声要約など")
+        self.tab_widget.addTab(self.audio_ai_widget, "音声や資料の要約")
+        
+        # 動画生成AIタブ（タブ4）
+        # 動画生成AIタブ（タブ4）
+        # Sora専用のWebView2ランチャーを使用
+        self.video_ai_widget = SoraWidget(self)
+        self.tab_widget.addTab(self.video_ai_widget, "動画生成")
+        
+        # 開発者AIタブ（タブ5）
+        developer_ai_services = self.ai_manager.get_all_developer_ai_services()
+        self.developer_ai_widget = AIComparisonWidget(
+            developer_ai_services, 
+            self.settings, 
+            self
+        )
+        self.tab_widget.addTab(self.developer_ai_widget, "開発者用")
         
         # 画像編集(WEB)タブ - 外部ブラウザで開くボタン
         self.web_editor_widget = WebEditorWidget(self)
@@ -91,49 +111,94 @@ class MainWindow(QMainWindow):
         # 最初のタブを初期化
         self.text_ai_widget.initialize_views()
     
-    def _create_toolbar(self):
-        """ツールバーの作成"""
-        from PySide6.QtCore import QSize
+    def _create_tab_corner_controls(self):
+        """タブバー右側のコントロールを作成"""
+        corner_widget = QWidget()
+        layout = QHBoxLayout(corner_widget)
+        layout.setContentsMargins(0, 0, 8, 0)
+        layout.setSpacing(4)
         
-        toolbar = QToolBar("メインツールバー")
-        toolbar.setMovable(False)
+        # 説明文ラベル
+        self.title_label = QLabel()
+        self.title_label.setStyleSheet("font-size: 11px; color: #A0A0A0; padding: 0 10px;")
+        layout.addWidget(self.title_label)
         
-        # アイコンサイズの設定（QSizeオブジェクトを使用）
-        icon_size = self.style().pixelMetric(QStyle.PixelMetric.PM_SmallIconSize)
-        toolbar.setIconSize(QSize(icon_size, icon_size))
-        self.addToolBar(toolbar)
+        # ボタンスタイル
+        btn_style = """
+            QToolButton {
+                background-color: #3A3A3A;
+                border: 1px solid #505050;
+                border-radius: 3px;
+                padding: 4px;
+                color: #FFFFFF;
+            }
+            QToolButton:hover {
+                background-color: #4A7BD8;
+                border: 1px solid #5B8DEE;
+            }
+            QToolButton:pressed {
+                background-color: #3A6BC8;
+            }
+        """
         
         # 戻るボタン
-        back_action = QAction("戻る", self)
-        back_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
-        back_action.triggered.connect(self._go_back)
-        toolbar.addAction(back_action)
+        back_btn = QToolButton()
+        back_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
+        back_btn.setToolTip("戻る")
+        back_btn.clicked.connect(self._go_back)
+        back_btn.setStyleSheet(btn_style)
+        layout.addWidget(back_btn)
         
         # 進むボタン
-        forward_action = QAction("進む", self)
-        forward_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
-        forward_action.triggered.connect(self._go_forward)
-        toolbar.addAction(forward_action)
+        forward_btn = QToolButton()
+        forward_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
+        forward_btn.setToolTip("進む")
+        forward_btn.clicked.connect(self._go_forward)
+        forward_btn.setStyleSheet(btn_style)
+        layout.addWidget(forward_btn)
         
         # 更新ボタン
-        reload_action = QAction("更新", self)
-        reload_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
-        reload_action.triggered.connect(self._reload)
-        toolbar.addAction(reload_action)
+        reload_btn = QToolButton()
+        reload_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        reload_btn.setToolTip("更新")
+        reload_btn.clicked.connect(self._reload)
+        reload_btn.setStyleSheet(btn_style)
+        layout.addWidget(reload_btn)
         
-        toolbar.addSeparator()
+        # 音量ミュートボタン（強調カラー）
+        volume_btn_style = """
+            QToolButton {
+                background-color: #10a37f;
+                border: 1px solid #0d8a6a;
+                border-radius: 3px;
+                padding: 4px 8px;
+                color: #FFFFFF;
+                font-weight: bold;
+            }
+            QToolButton:hover {
+                background-color: #0d8a6a;
+                border: 1px solid #0a7559;
+            }
+            QToolButton:pressed {
+                background-color: #0a7559;
+            }
+        """
         
-        # タイトルラベル（中央） - タブに応じて説明文が変わる
-        toolbar.addWidget(QLabel())  # スペーサー
-        self.title_label = QLabel()
-        self.title_label.setStyleSheet("font-size: 12px; color: #E0E0E0; padding: 0 20px;")
-        toolbar.addWidget(self.title_label)
+        self.volume_btn = QToolButton()
+        self.volume_btn.setText("🔊")
+        self.volume_btn.setToolTip("音量ミュート/アンミュート")
+        self.volume_btn.setStyleSheet(volume_btn_style)
+        self.volume_btn.clicked.connect(self._toggle_mute)
+        layout.addWidget(self.volume_btn)
         
-        # 初期説明文を設定
+        # 音量制御の初期化
+        self._init_volume_control()
+        
+        # コーナーウィジェットとしてタブバーの右端に設定
+        self.tab_widget.setCornerWidget(corner_widget, Qt.Corner.TopRightCorner)
+        
         # 初期説明文を設定
         self._update_title_description()
-        
-        self.toolbar = toolbar
     
     def _create_statusbar(self):
         """ステータスバーの作成"""
@@ -155,13 +220,6 @@ class MainWindow(QMainWindow):
         qss = """
         QMainWindow {
             background-color: #1E1E1E;
-        }
-        
-        QToolBar {
-            background-color: #2D2D2D;
-            border-bottom: 1px solid #404040;
-            spacing: 8px;
-            padding: 4px;
         }
         
         QToolButton {
@@ -303,7 +361,11 @@ class MainWindow(QMainWindow):
         elif current_index == 1:  # 画像AIタブ
             text = "🎨 命令文は英語のみなのでDeepLで翻訳コピペ"
         elif current_index == 2:  # 音声AIタブ
-            text = "🎙️ダウンロードできたら認証ウィンドウは閉じて下さい"
+            text = "🎙️登録した資料の中からのみ検索、流出の心配なし"
+        elif current_index == 3:  # 動画生成AIタブ
+            text = "🎥 Sora (動画生成) | アクセス権限が必要です"
+        elif current_index == 4:  # 開発者AIタブ
+            text = "🔧 Google AI Studio (開発者向け) | APIキーの管理に注意"
         else:
             text = "adobeは不安定なのでブラウザショートカットにしました"
         
@@ -320,6 +382,76 @@ class MainWindow(QMainWindow):
         """ウィンドウジオメトリの保存"""
         # 実装は省略（必要に応じてQByteArrayとして保存）
         pass
+    
+    def _init_volume_control(self):
+        """音量制御の初期化"""
+        self.volume_interface = None
+        self.is_muted = False
+        try:
+            # pycawを使ってデフォルトスピーカーを取得
+            devices = AudioUtilities.GetSpeakers()
+            
+            # 内部のCOMデバイスにアクセス
+            interface = devices._dev.Activate(
+                IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            self.volume_interface = cast(interface, POINTER(IAudioEndpointVolume))
+            
+            # 初期状態を取得
+            self.is_muted = bool(self.volume_interface.GetMute())
+            self._update_volume_button()
+            
+        except Exception as e:
+            print(f"Volume control init error: {e}")
+            self.volume_interface = None
+    
+    def _toggle_mute(self):
+        """ミュート状態をトグル"""
+        if self.volume_interface:
+            try:
+                self.is_muted = not self.is_muted
+                self.volume_interface.SetMute(self.is_muted, None)
+                self._update_volume_button()
+            except Exception as e:
+                print(f"Mute toggle error: {e}")
+    
+    def _update_volume_button(self):
+        """ボタンの表示を更新"""
+        if self.volume_interface:
+            try:
+                self.is_muted = self.volume_interface.GetMute()
+            except:
+                pass
+        
+        if self.is_muted:
+            self.volume_btn.setText("🔇")
+            self.volume_btn.setStyleSheet("""
+                QToolButton {
+                    background-color: #dc3545;
+                    border: 1px solid #c82333;
+                    border-radius: 3px;
+                    padding: 4px 8px;
+                    color: #FFFFFF;
+                    font-weight: bold;
+                }
+                QToolButton:hover {
+                    background-color: #c82333;
+                }
+            """)
+        else:
+            self.volume_btn.setText("🔊")
+            self.volume_btn.setStyleSheet("""
+                QToolButton {
+                    background-color: #10a37f;
+                    border: 1px solid #0d8a6a;
+                    border-radius: 3px;
+                    padding: 4px 8px;
+                    color: #FFFFFF;
+                    font-weight: bold;
+                }
+                QToolButton:hover {
+                    background-color: #0d8a6a;
+                }
+            """)
     
     def closeEvent(self, event):
         """ウィンドウを閉じる時の処理"""
