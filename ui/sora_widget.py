@@ -51,17 +51,35 @@ class SoraWidget(QWidget):
         self.search_timer.start(500)
     
     def _launch_process(self):
-        """別プロセスでRun Soraスクリプトを起動"""
+        """別プロセスでSoraを起動"""
         try:
-            script_path = os.path.join(os.getcwd(), 'run_sora.py')
-            creationflags = 0x08000000  # CREATE_NO_WINDOW
-            
-            self.process = subprocess.Popen(
-                [sys.executable, script_path],
-                creationflags=creationflags
-            )
+            # PyInstallerでビルドされた場合のパス解決
+            if getattr(sys, 'frozen', False):
+                # ビルド版: run_sora.exe を直接実行
+                base_path = os.path.dirname(sys.executable)
+                exe_path = os.path.join(base_path, 'run_sora.exe')
+                
+                if not os.path.exists(exe_path):
+                    self.status_label.setText(f"Error: run_sora.exe not found")
+                    return
+                
+                creationflags = 0x08000000  # CREATE_NO_WINDOW
+                self.process = subprocess.Popen([exe_path], creationflags=creationflags)
+            else:
+                # 開発版: python run_sora.py を実行
+                script_path = os.path.join(os.getcwd(), 'run_sora.py')
+                
+                if not os.path.exists(script_path):
+                    self.status_label.setText(f"Error: run_sora.py not found")
+                    return
+                
+                creationflags = 0x08000000  # CREATE_NO_WINDOW
+                self.process = subprocess.Popen(
+                    [sys.executable, script_path],
+                    creationflags=creationflags
+                )
         except Exception as e:
-            self.status_label.setText(f"Error launching process: {str(e)}")
+            self.status_label.setText(f"Error: {str(e)}")
 
     def _search_window(self):
         """ターゲットウィンドウを探す"""
